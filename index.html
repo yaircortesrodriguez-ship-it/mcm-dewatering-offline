@@ -343,6 +343,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid 
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <span id="offlinePendingText" class="offline-secondary">Pendientes: 0</span>
+        <button id="installAppButton" type="button" class="offline-sync-button" style="display:none" onclick="installMcmPwa()">Instalar app</button>
         <button id="offlineSyncButton" type="button" class="offline-sync-button" onclick="syncPendingControls()">Sincronizar</button>
       </div>
     </section>
@@ -464,11 +465,72 @@ window.addEventListener('load',async()=>{
   }
 });
 
+let deferredInstallPrompt=null;
+
+function isMcmStandalone(){
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone===true
+  );
+}
+
+function updateInstallAppButton(){
+  const btn=document.getElementById('installAppButton');
+  if(!btn) return;
+
+  if(isMcmStandalone()){
+    btn.style.display='none';
+    return;
+  }
+
+  btn.style.display=deferredInstallPrompt?'inline-flex':'none';
+}
+
+window.addEventListener('beforeinstallprompt',event=>{
+  event.preventDefault();
+  deferredInstallPrompt=event;
+  updateInstallAppButton();
+});
+
+window.addEventListener('appinstalled',()=>{
+  deferredInstallPrompt=null;
+  updateInstallAppButton();
+  updateOfflineStatus('Aplicación instalada correctamente en esta tablet.');
+});
+
+async function installMcmPwa(){
+  if(isMcmStandalone()){
+    updateOfflineStatus('La aplicación ya está instalada.');
+    return;
+  }
+
+  if(!deferredInstallPrompt){
+    updateOfflineStatus(
+      'Chrome todavía está preparando la instalación. Espera unos segundos y vuelve a intentarlo.'
+    );
+    return;
+  }
+
+  try{
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+  }catch(e){
+    console.error('Instalación PWA:',e);
+  }finally{
+    deferredInstallPrompt=null;
+    updateInstallAppButton();
+  }
+}
+
 function registerMcmServiceWorker(){
   if(!('serviceWorker' in navigator)) return;
 
-  navigator.serviceWorker.register('./sw.js')
-    .then(()=>console.log('MCM Dewatering: Service Worker activo.'))
+  navigator.serviceWorker.register('./sw.js',{scope:'./'})
+    .then(()=>navigator.serviceWorker.ready)
+    .then(()=>{
+      console.log('MCM Dewatering: Service Worker activo y listo.');
+      updateInstallAppButton();
+    })
     .catch(err=>console.error('Service Worker:',err));
 }
 
@@ -1026,7 +1088,12 @@ async function offerRestoreDraft(){
     const row=await offlineKvGet(OFFLINE_DRAFT_KEY);
     const draft=row&&row.value?row.value:null;
 
-    if(!draft||!draftHasUsefulData(draft)) return false;
+    if(!draft) return false;
+
+    if(!draftHasUsefulData(draft)){
+      await offlineKvDelete(OFFLINE_DRAFT_KEY);
+      return false;
+    }
 
     const savedText=draft.savedAt
       ? new Date(draft.savedAt).toLocaleString()
