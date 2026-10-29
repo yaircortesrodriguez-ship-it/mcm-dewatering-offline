@@ -521,7 +521,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid 
 </div>
 
 <script>
-const DEFAULT_HEADER_IMAGE = '';
+const DEFAULT_HEADER_IMAGE = './mcm-header.jpg';
 
 const state={
   config:{},sections:[],equipment:[],fields:[],options:{},
@@ -1757,7 +1757,7 @@ function renderClosure(){
     '<label class="required">Evidencia fotográfica del área</label>'+
     '<div class="help">Adjunte una fotografía al finalizar la ronda.</div>'+
     '<div class="photo-actions">'+
-      '<input id="housekeepingPhotoInput" type="file" accept="image/*" capture="environment" style="display:none">'+
+      '<input id="housekeepingPhotoInput" type="file" accept="image/*" style="display:none">'+
       '<button id="housekeepingPhotoButton" type="button" class="photo-button">📷 Adjuntar fotografía</button>'+
       '<button id="removeHousekeepingPhotoButton" type="button" class="photo-remove">Quitar imagen</button>'+
       '<span id="housekeepingPhotoStatus" class="housekeeping-required-badge">Requerida</span>'+

@@ -1,4 +1,4 @@
-const CACHE_NAME='mcm-dewatering-pwa-v2-15';
+const CACHE_NAME='mcm-dewatering-pwa-v2-17';
 const BASE='/mcm-dewatering-offline/';
 const INDEX=BASE+'index.html';
 
@@ -7,7 +7,8 @@ const APP_SHELL=[
   INDEX,
   BASE+'manifest.webmanifest',
   BASE+'icon-192.png',
-  BASE+'icon-512.png'
+  BASE+'icon-512.png',
+  BASE+'mcm-header.jpg'
 ];
 
 self.addEventListener('install',event=>{
