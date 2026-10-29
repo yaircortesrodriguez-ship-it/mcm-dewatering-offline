@@ -1,4 +1,4 @@
-const CACHE_NAME='mcm-dewatering-pwa-v2-2';
+const CACHE_NAME='mcm-dewatering-pwa-v2-15';
 const BASE='/mcm-dewatering-offline/';
 const INDEX=BASE+'index.html';
 
