@@ -536,7 +536,8 @@ const state={
     clientControlId:'',
     controlCreatedAt:'',
     syncing:false,
-    lastSavedAt:null
+    lastSavedAt:null,
+    finalized:false
   }
 };
 
@@ -1092,7 +1093,7 @@ function formatOfflineClock(value){
 }
 
 function scheduleDraftSave(delay){
-  if(!state.offline.ready||state.offline.restoring) return;
+  if(!state.offline.ready||state.offline.restoring||state.offline.finalized) return;
 
   clearTimeout(state.offline.saveTimer);
   state.offline.saveTimer=setTimeout(()=>{
@@ -1157,7 +1158,7 @@ function captureDraftSnapshot(){
 }
 
 async function saveCurrentDraftNow(){
-  if(!state.offline.ready||state.offline.restoring) return;
+  if(!state.offline.ready||state.offline.restoring||state.offline.finalized) return;
 
   try{
     const draft=captureDraftSnapshot();
@@ -1199,6 +1200,25 @@ async function offerRestoreDraft(){
     const row=await offlineKvGet(OFFLINE_DRAFT_KEY);
     const draft=row&&row.value?row.value:null;
 
+    // Si este borrador ya corresponde a un control recibido por el servidor,
+    // se elimina para que nunca reutilice el mismo clientControlId.
+    if(draft&&navigator.onLine&&draft.clientControlId){
+      try{
+        const serverState=await queryRoundSyncStatus(draft.clientControlId);
+
+        if(serverState&&serverState.complete&&serverState.ok!==false){
+          await offlineKvDelete(OFFLINE_DRAFT_KEY);
+          state.offline.clientControlId=newClientControlId();
+          state.offline.controlCreatedAt=new Date().toISOString();
+          state.offline.finalized=false;
+          updateOfflineStatus('Control anterior ya sincronizado. Nuevo control listo.');
+          return false;
+        }
+      }catch(e){
+        console.warn('Verificación de borrador previo:',e);
+      }
+    }
+
     if(!draft) return false;
 
     if(!draftHasUsefulData(draft)){
@@ -1218,6 +1238,7 @@ async function offerRestoreDraft(){
     );
 
     if(continueDraft){
+      state.offline.finalized=false;
       await restoreDraftSnapshot(draft);
       return true;
     }
@@ -1225,6 +1246,7 @@ async function offerRestoreDraft(){
     await offlineKvDelete(OFFLINE_DRAFT_KEY);
     state.offline.clientControlId=newClientControlId();
     state.offline.controlCreatedAt=new Date().toISOString();
+    state.offline.finalized=false;
     return false;
   }catch(e){
     console.error('No se pudo recuperar borrador:',e);
@@ -1365,6 +1387,9 @@ function restoreSignatureData(dataUrl){
 }
 
 async function clearCurrentDraftAndIdentity(){
+  clearTimeout(state.offline.saveTimer);
+  state.offline.finalized=false;
+
   try{
     if(state.offline.ready){
       await offlineKvDelete(OFFLINE_DRAFT_KEY);
@@ -1392,6 +1417,8 @@ async function queueCurrentControl(payload,reason){
   };
 
   await offlineQueuePut(entry);
+  clearTimeout(state.offline.saveTimer);
+  state.offline.finalized=true;
   await offlineKvDelete(OFFLINE_DRAFT_KEY);
   await updateOfflinePendingCount();
 
@@ -1525,6 +1552,9 @@ async function saveRoundPromise(payload){
         return {
           ok:true,
           duplicate:Boolean(status.duplicate),
+          pendingReview:Boolean(status.pendingReview),
+          reviewEmailSent:Boolean(status.reviewEmailSent),
+          reviewEmailMessage:status.reviewEmailMessage||'',
           roundId:status.roundId||'',
           controlNumber:status.controlNumber||'',
           count:Number(status.count||payload.equipment.length||0),
@@ -2536,6 +2566,9 @@ async function submitControl(){
 
   saveRoundPromise(p)
     .then(async r=>{
+      clearTimeout(state.offline.saveTimer);
+      state.offline.finalized=true;
+
       try{
         await offlineKvDelete(OFFLINE_DRAFT_KEY);
       }catch(e){}
@@ -2615,6 +2648,7 @@ async function submitControl(){
 async function startNewControl(){
   hideError();
 
+  state.offline.finalized=false;
   await clearCurrentDraftAndIdentity();
 
   // Libera primero las imágenes grandes de memoria.
