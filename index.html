@@ -829,7 +829,10 @@ function applyConfig(){
   $('previewButton').textContent=c.PREVIEW_BUTTON_TEXT||'Vista previa';
   $('sendButton').textContent=c.SEND_BUTTON_TEXT||'ENVIAR CONTROL';
   $('newControlButton').textContent=c.NEW_CONTROL_BUTTON_TEXT||'NUEVO CONTROL';
-  $('footerText').textContent=c.FOOTER_TEXT||'';
+  {
+    const baseFooter=String(c.FOOTER_TEXT||'Control digital de flujos Dewatering').replace(/\s*\|\s*Copyright © 2026 Yair Cortés\.?\s*$/i,'').trim();
+    $('footerText').textContent=baseFooter+' | Copyright © 2026 Yair Cortés.';
+  }
 
   setImage('headerImage',c.HEADER_IMAGE_URL || DEFAULT_HEADER_IMAGE, DEFAULT_HEADER_IMAGE);
   setImage('logoLeft',c.LOGO_LEFT_URL);
