@@ -1518,6 +1518,30 @@ async function queryRoundSyncStatus(clientControlId){
   );
 }
 
+function kickReviewNotification(clientControlId){
+  if(!navigator.onLine||!clientControlId)return;
+
+  jsonpRequest(
+    {
+      api:'notifyReview',
+      clientControlId:String(clientControlId||'')
+    },
+    20000
+  )
+    .then(result=>{
+      if(result&&result.sent){
+        console.log('Aviso de revisión enviado:',result.recipients||[]);
+      }else if(result&&result.message){
+        console.warn('Aviso de revisión:',result.message);
+      }
+    })
+    .catch(err=>{
+      // No afecta el control guardado. El trigger del servidor reintentará.
+      console.warn('Aviso de revisión en segundo plano:',err);
+    });
+}
+
+
 async function saveRoundPromise(payload){
   if(!navigator.onLine){
     throw Error('Sin conexión.');
@@ -1600,6 +1624,10 @@ async function syncPendingControls(){
 
         const result=await saveRoundPromise(entry.payload);
         await offlineQueueDelete(entry.id);
+
+        if(result&&result.pendingReview){
+          kickReviewNotification(entry.payload.clientControlId);
+        }
 
         console.log(
           'Control pendiente sincronizado:',
@@ -2566,6 +2594,10 @@ async function submitControl(){
 
   saveRoundPromise(p)
     .then(async r=>{
+      if(r&&r.pendingReview){
+        kickReviewNotification(p.clientControlId);
+      }
+
       clearTimeout(state.offline.saveTimer);
       state.offline.finalized=true;
 
